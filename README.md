@@ -223,8 +223,8 @@ External LLM APIs are mocked, so the test suite does not require live provider c
 ### Docker Compose
 
 ```bash
-git clone https://github.com/ChetanVK10/EvalForge.git
-cd EvalForge
+git clone https://github.com/ChetanVK10/LLMOps-Studio.git
+cd LLMOps-Studio
 
 docker compose up --build
 ```
