@@ -45,22 +45,7 @@ Evaluating LLM applications is more than checking whether an answer looks correc
 - 🔍 **Detect** quality, latency, cost, and case-level regressions between releases
 - 🚦 **Gate** model and prompt changes with configurable `PASS / WARNING / FAIL` promotion policies
 
-### Evaluation Workflow
-
-```text
-Dataset + Prompt + Model
-          ↓
-      Evaluation
-          ↓
-   Experiment Tracking
-          ↓
- Baseline vs Candidate
-          ↓
- Regression Analysis
-          ↓
-   Promotion Gate
- PASS / WARNING / FAIL
-```
+![LLMOps Studio Evaluation Workflow](screenshots/evaluation-workflow.png)
 
 ## 🚀 Core Features
 
@@ -75,7 +60,6 @@ Dataset + Prompt + Model
 | ⚡ | **Async Execution** | Bounded concurrent evaluation with per-case failure isolation |
 | 💾 | **Caching & Persistence** | PostgreSQL experiment storage with Redis dashboard caching |
 
-## 🏗️ Architecture
 ## 🏗️ Architecture
 
 The platform follows an end-to-end evaluation pipeline connecting the web interface, FastAPI backend, async experiment runner, model providers, evaluation engine, telemetry, and regression gates.
