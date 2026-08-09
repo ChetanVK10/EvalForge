@@ -1,174 +1,356 @@
-# LLMOps Studio — LLM Evaluation, Regression Testing & Release Promotion Platform
+<div align="center">
 
-LLMOps Studio is an enterprise-grade platform for evaluating LLM outputs, detecting quality/latency/cost regressions between prompt versions or model providers, and automating release promotion decisions.
+# ⚡ LLMOps Studio
 
-Built with **React**, **FastAPI**, **PostgreSQL**, **Redis**, and **Docker**, LLMOps Studio transforms LLM evaluation from ad-hoc manual testing into a continuous delivery release gate.
+### End-to-End LLM Evaluation, Experiment Tracking & Regression Gates
+
+<p>
+  <strong>Evaluate → Compare → Detect Regressions → Promote with Confidence</strong>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3.x-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/FastAPI-0.110%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React"/>
+  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+  <img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis"/>
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"/>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Groq-LLM%20Provider-F55036?style=flat-square" alt="Groq"/>
+  <img src="https://img.shields.io/badge/Google%20Gemini-LLM%20Provider-4285F4?style=flat-square" alt="Google Gemini"/>
+  <img src="https://img.shields.io/badge/pytest-Tested-0A9EDC?style=flat-square&logo=pytest&logoColor=white" alt="pytest"/>
+</p>
+
+</div>
 
 ---
 
-## Key Features
+**LLMOps Studio** is a full-stack LLM evaluation platform built to make model and prompt changes measurable, reproducible, and safe to promote.
 
-- **Dataset & Test Case Management**: Structured dataset curation with category metadata and JSONL import.
-- **Prompt Versioning & Model Configurations**: Fine-grained versioning of prompt templates (system/user templates) and provider model configurations.
-- **Multi-Provider LLM Gateway**: Standardized inference across **Groq** and **Google Gemini** models with unified latency and token telemetry.
-- **Hybrid Evaluation Engine**: Combines deterministic evaluators (Exact Match, Keyword Match, Levenshtein Distance), semantic similarity embeddings, and LLM-as-a-Judge evaluations.
-- **Async Experiment Runner & Persistence**: Bounded async execution with progress tracking, error isolation, and full relational telemetry persistence.
-- **Regression Engine & Explainable Promotion Gate**: Symmetric case-level and aggregate delta calculations evaluating release safety against configurable quality/factuality regression thresholds.
-- **Redis Caching**: Lightweight caching of read-heavy dashboard aggregations with TTL expiration, explicit invalidation, and fail-open PostgreSQL fallback.
-- **Production Containerization**: Fully containerized multi-stage Docker builds with Docker Compose orchestration and automated database migrations (`alembic upgrade head`).
+It combines **hybrid evaluation, experiment tracking, multi-provider execution, regression analysis, and configurable promotion gates** into a single workflow.
 
----
+> **Run evaluations. Measure quality. Catch regressions. Make release decisions with evidence.**
 
-## System Architecture
+ ## 🎯 What It Solves
+
+Evaluating LLM applications is more than checking whether an answer looks correct.
+
+**LLMOps Studio** provides a reproducible workflow to:
+
+- 🧪 **Evaluate** model outputs using deterministic, semantic, and LLM-as-a-Judge metrics
+- 📊 **Track** experiments across models, prompts, datasets, latency, tokens, and cost
+- 🔍 **Detect** quality, latency, cost, and case-level regressions between releases
+- 🚦 **Gate** model and prompt changes with configurable `PASS / WARNING / FAIL` promotion policies
+
+### Evaluation Workflow
+
+```text
+Dataset + Prompt + Model
+          ↓
+      Evaluation
+          ↓
+   Experiment Tracking
+          ↓
+ Baseline vs Candidate
+          ↓
+ Regression Analysis
+          ↓
+   Promotion Gate
+ PASS / WARNING / FAIL
+```
+
+## 🚀 Core Features
+
+| | Capability | What it does |
+|---|---|---|
+| 🧪 | **Hybrid Evaluation** | Deterministic checks, TF-IDF semantic similarity, and LLM-as-a-Judge |
+| 🔀 | **Multi-Provider Gateway** | Run evaluations across Groq and Google Gemini |
+| 📊 | **Experiment Tracking** | Track quality, pass rate, latency, tokens, cost, and execution status |
+| 📝 | **Prompt Versioning** | Create and manage versioned prompts for reproducible experiments |
+| 🔍 | **Regression Detection** | Compare baseline vs candidate runs at metric, category, and case level |
+| 🚦 | **Promotion Gates** | Configurable `PASS / WARNING / FAIL` release decisions |
+| ⚡ | **Async Execution** | Bounded concurrent evaluation with per-case failure isolation |
+| 💾 | **Caching & Persistence** | PostgreSQL experiment storage with Redis dashboard caching |
+
+## 🏗️ Architecture
 
 ```mermaid
-graph TD
-    Client[React / TypeScript Frontend] -->|REST API| API[FastAPI Application]
-    API -->|Read-Heavy Cache| Redis[(Redis Cache)]
-    API -->|Relational Persistence| Postgres[(PostgreSQL DB)]
+flowchart LR
+    U[👤 User] --> F[⚛️ React + TanStack Start]
 
-    API --> Runner[Async Experiment Runner]
-    Runner --> Gateway[Multi-Provider LLM Gateway]
+    F -->|REST / JSON| API[⚡ FastAPI]
 
-    Gateway -->|Inference| Groq[Groq API]
-    Gateway -->|Inference| Gemini[Google Gemini API]
+    API --> R[🚀 Async Experiment Runner]
+    API --> DB[(🐘 PostgreSQL)]
+    API --> C[(⚡ Redis Cache)]
 
-    Runner --> Engine[Hybrid Evaluation Engine]
-    Engine -->|Deterministic| Det[Exact Match / Levenshtein]
-    Engine -->|Semantic| Sem[Sentence Transformers]
-    Engine -->|LLM Judge| Judge[LLM-as-a-Judge]
+    R --> G[🔀 Model Gateway]
 
-    API --> RegEngine[Regression Engine]
-    RegEngine --> Gate[Promotion Gate]
-    Gate -->|Verdict| Decision[PASS / FAIL Decision]
+    G --> GR[Groq]
+    G --> GE[Google Gemini]
+
+    R --> E[🧪 Evaluation Engine]
+
+    E --> D[Deterministic]
+    E --> S[TF-IDF Similarity]
+    E --> J[LLM-as-a-Judge]
+
+    R --> T[📊 Experiment Telemetry]
+
+    T --> DB
+
+    DB --> RG[🔍 Regression Service]
+    RG --> PG[🚦 Promotion Gate]
+
+    PG --> V{PASS / WARNING / FAIL}
 ```
+## 📸 Product Showcase
 
----
+### 📊 Evaluation Dashboard
+>Monitor evaluation runs, quality, latency, and regression health from a single dashboard.
 
-## Technology Stack
+![Evaluation Dashboard](screenshots/01-evaluation-dashboard.png)
 
-- **Frontend**: React 19, TypeScript, Vite, TanStack Start (Nitro SSR), Tailwind CSS, shadcn/ui, Recharts.
-- **Backend**: Python 3.11, FastAPI, SQLAlchemy 2.0 (ORM), Alembic (Migrations), Pydantic v2.
-- **Database & Cache**: PostgreSQL 16, Redis 7 (fail-open cache).
-- **LLM Integrations**: Groq SDK (`llama-3.3-70b-versatile`), Google GenAI SDK (`gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`).
-- **Containerization**: Docker, Docker Compose.
 
----
+### 🧪 Experiment Tracking
+> Track experiments across datasets, models, providers, prompt versions, quality, latency, and execution status.
 
-## Local Development Setup
+![Experiment Tracking](screenshots/02-experiment-tracking.png)
 
-### 1. Backend Setup
+### 🔎 Detailed Evaluation Results
+> Drill down from overall quality to individual metrics, categories, test cases, latency, and token usage.
+
+![Evaluation Results](screenshots/03-groq-evaluation-results.png)
+
+
+## 🔍 Regression Detection & Promotion
+
+Model and prompt changes are evaluated against a baseline before promotion.
+
+The system compares **quality, evaluation metrics, latency, cost, categories, and individual test cases**, then applies configurable promotion rules to produce a clear `PASS`, `WARNING`, or `FAIL` verdict.
+
+![Regression Comparison](screenshots/04-groq-regression-comparison.png)
+
+> Example: Prompt v2 improves overall quality from **92.3% → 99.4%** while reducing latency from **349 ms → 341 ms**, resulting in a **Promotion Gate: PASSED**.
+
+## 🔀 Multi-Provider Evaluation
+
+LLMOps Studio uses a common model gateway to run the same evaluation workflow across different LLM providers.
+
+- **Groq** — Fast inference with retry and error handling
+- **Google Gemini** — Async generation with timeout and retry handling
+- **Unified Evaluation** — Both providers produce the same experiment telemetry and evaluation results
+
+This makes it possible to compare model and prompt changes without changing the evaluation workflow.
+
+![Gemini Regression Comparison](screenshots/05-gemini-regression-comparison.png)
+
+## 🧪 Evaluation Engine
+
+LLMOps Studio combines multiple evaluation strategies instead of relying on a single score:
+
+| Type | Evaluators |
+|---|---|
+| **Deterministic** | Exact Match · Contains · Regex · JSON Validation |
+| **Semantic** | TF-IDF character n-gram cosine similarity |
+| **LLM-as-a-Judge** | Correctness · Relevance · Instruction Following · Completeness · Groundedness |
+
+Each experiment aggregates these signals into measurable quality scores while preserving per-case results and reasoning.
+
+## ⚙️ Prompt & Model Configuration
+
+Keep model settings and prompt changes reproducible across experiments.
+
+- 📝 **Versioned Prompts** — Maintain multiple prompt versions with system prompts, templates, and notes.
+- 🤖 **Model Configurations** — Store provider, model, temperature, and token limits.
+- 🔄 **Reproducible Experiments** — Experiments snapshot the selected model and prompt configuration at execution time.
+
+<table>
+<tr>
+<td width="50%">
+
+**Model Configurations**
+
+<img src="screenshots/06-model-configurations.png" alt="Model Configurations">
+
+</td>
+<td width="50%">
+
+**Prompt Versioning**
+
+<img src="screenshots/07-prompt-configurations.png" alt="Prompt Configurations">
+
+</td>
+</tr>
+</table>
+
+> Configuration changes can be evaluated as controlled experiments instead of being lost between runs.
+
+## 📊 Experiment Tracking
+
+Every evaluation run is stored as a reproducible experiment with its dataset, model, prompt version, results, and execution telemetry.
+
+Track:
+
+- Quality & pass rate
+- Average & P95 latency
+- Input/output/total tokens
+- Estimated cost
+- Per-case evaluation results
+- Experiment status and history
+
+![Experiment Tracking](screenshots/02-experiment-tracking.png)
+
+## 🚦 Promotion Gates
+
+Regression results are converted into an actionable release decision.
+
+The configurable gate evaluates:
+
+- Overall quality regression
+- Factuality regression
+- Latency increase
+- Cost increase
+- Critical-category regressions
+- Newly failing test cases
+
+**Result:** `PASS` · `WARNING` · `FAIL`
+
+> This turns evaluation results into a practical pre-release quality gate.
+
+## ⚡ Engineering Highlights
+
+- **Async execution** with bounded concurrency using `asyncio`
+- **Failure isolation** so one failed test case does not stop an experiment
+- **Provider retries & timeouts** for transient LLM failures
+- **Typed provider errors** for safer failure handling
+- **Redis fail-open caching** so cache failures do not break the API
+- **Database migrations** with Alembic
+- **Docker Compose** for reproducible local deployment
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19 · TypeScript · TanStack Start · TanStack Router · Tailwind CSS · Recharts |
+| **Backend** | Python · FastAPI · SQLAlchemy · Pydantic |
+| **LLM Providers** | Groq · Google Gemini |
+| **Evaluation** | scikit-learn · JSON Schema · Custom Evaluators |
+| **Data** | PostgreSQL 16 · Redis 7 |
+| **DevOps** | Docker Compose · Alembic |
+| **Testing** | pytest · SQLite · Mocked LLM APIs |
+## 🧪 Testing
+
+The backend includes a dedicated automated test suite covering:
+
+- API endpoints & database operations
+- Evaluation engine and evaluators
+- Experiment execution & concurrency
+- Provider gateway and retry handling
+- Regression & promotion gates
+- Dashboard and Redis caching
+- Settings and CORS
+
+External LLM APIs are mocked, so the test suite does not require live provider calls.
 
 ```bash
-cd backend
-python -m venv .venv
-# On Windows: .venv\Scripts\activate  |  On Linux/Mac: source .venv/bin/activate
-pip install -r requirements.txt
-
-# Run migrations against local database
-alembic upgrade head
-
-# Start FastAPI development server
-uvicorn app.main:app --reload --port 8000
-```
-
-### 2. Frontend Setup
-
-```bash
-# In the repository root:
-npm install
-
-# Start Vite development server
-npm run dev
-```
-
-The frontend will run on `http://localhost:5173` and communicate with the FastAPI backend at `http://localhost:8000/api/v1`.
-
----
-
-## Docker Compose Quick Start
-
-To launch the complete production stack (PostgreSQL, Redis, FastAPI Backend, Nitro Frontend):
-
-1. **Configure Environment Variables**:
-   Copy `.env.example` to `.env` and add your LLM provider keys:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   Set `GROQ_API_KEY` and `GEMINI_API_KEY` in `.env`.
-
-2. **Launch Services**:
-
-   ```bash
-   docker compose up --build
-   ```
-
-3. **Access Services**:
-   - **Frontend UI**: `http://localhost:3000`
-   - **FastAPI API Docs**: `http://localhost:8000/docs`
-   - **Health Check**: `http://localhost:8000/api/v1/health`
-   - **Readiness Check**: `http://localhost:8000/api/v1/ready`
-
----
-
-## Environment Variables
-
-| Variable                      | Description                            | Default / Example                                                   |
-| :---------------------------- | :------------------------------------- | :------------------------------------------------------------------ |
-| `DATABASE_URL`                | PostgreSQL connection string           | `postgresql+psycopg://postgres:postgres@localhost:5432/llm_evalops` |
-| `REDIS_URL`                   | Redis cache connection string          | `redis://localhost:6379/0`                                          |
-| `CACHE_ENABLED`               | Toggle Redis cache                     | `true`                                                              |
-| `DASHBOARD_CACHE_TTL_SECONDS` | Redis cache TTL for dashboard summary  | `60`                                                                |
-| `CORS_ORIGINS`                | Allowed CORS origins (comma-separated) | `http://localhost:5173,http://localhost:3000`                       |
-| `GROQ_API_KEY`                | Server-side Groq provider API key      | `gsk_...`                                                           |
-| `GEMINI_API_KEY`              | Server-side Gemini provider API key    | `AIza...`                                                           |
-| `VITE_API_BASE_URL`           | Frontend API base URL                  | `http://localhost:8000/api/v1`                                      |
-
----
-
-## Testing
-
-### Backend Unit & Integration Tests
-
-```bash
-# Run pytest test suite (66 tests covering DB, Gateway, Evaluators, Regression, Cache)
 pytest backend/tests
-```
 
-### Frontend Production Build Verification
+```markdown
+## 🚀 Quick Start
+
+### Docker Compose
 
 ```bash
-npm run build
+git clone https://github.com/ChetanVK10/EvalForge.git
+cd EvalForge
+
+docker compose up --build
+```
+## 🚀 Quick Start
+
+### Docker Compose
+
+```bash
+git clone https://github.com/ChetanVK10/EvalForge.git
+cd EvalForge
+
+docker compose up --build
+```
+
+Configure your provider keys in `backend/.env`:
+
+```env
+GROQ_API_KEY=your_groq_key
+GEMINI_API_KEY=your_gemini_key
+```
+
+The application will start as:
+
+- **Frontend:** `http://localhost:3000`
+- **API:** `http://localhost:8000`
+- **API Docs:** `http://localhost:8000/docs`
+
+---
+
+## 📁 Project Structure
+
+```text
+├── backend/
+│   ├── app/
+│   │   ├── api/              # REST API
+│   │   ├── models/           # Database models
+│   │   ├── schemas/          # Pydantic schemas
+│   │   └── services/         # Evaluation, providers & regression
+│   ├── tests/                # Automated tests
+│   └── alembic/              # Database migrations
+│
+├── src/
+│   ├── routes/               # Frontend pages
+│   ├── components/           # UI components
+│   ├── api/                  # Typed API client
+│   └── types/                # TypeScript types
+│
+├── screenshots/              # Product screenshots
+├── docker-compose.yml
+└── README.md
 ```
 
 ---
 
-## API Overview
+## 🔌 API
 
-- `GET /api/v1/dashboard`: Cached workspace health metrics and regression alerts.
-- `GET / POST /api/v1/datasets`: Dataset listing and creation.
-- `POST /api/v1/datasets/{id}/cases`: Add individual evaluation case.
-- `POST /api/v1/datasets/{id}/import`: Bulk import test cases from JSONL payload.
-- `GET / POST /api/v1/configurations/models`: Model configurations list and creation.
-- `GET / POST /api/v1/prompts`: Prompt configurations and prompt version management.
-- `POST /api/v1/evaluations`: Trigger asynchronous evaluation experiment execution.
-- `GET /api/v1/evaluations/{id}/status`: Poll execution progress status.
-- `GET /api/v1/experiments`: Experiment execution history.
-- `GET /api/v1/experiments/{id}`: Detailed experiment results with case breakdown and judge explanations.
-- `POST /api/v1/regressions/compare`: Baseline vs candidate experiment regression analysis and promotion gate evaluation.
+The FastAPI backend exposes REST endpoints for the complete evaluation lifecycle.
+
+**Datasets** · **Models** · **Prompts** · **Evaluations** · **Experiments** · **Regressions** · **Settings**
+
+Interactive documentation:
+
+- `/docs` — Swagger UI
+- `/redoc` — ReDoc
 
 ---
 
-## Scalability & Production Architecture Notes
+## 🎯 Project Focus
 
-- **Redis Read Caching**: Redis caches expensive, read-heavy dashboard aggregation metrics (`dashboard:summary:v1`). The cache automatically invalidates upon experiment completion or new experiment creation, and features **fail-open** fallback to PostgreSQL if Redis is offline.
-- **Bounded Async Runner**: Experiment execution uses asyncio concurrency bounds to prevent API rate limiting while maintaining high throughput.
-- **Worker Queue Transition Path**: At larger scale, experiment execution can be decoupled from the web application by replacing background tasks with a Redis-backed distributed task queue (e.g., Celery or RQ), allowing API servers and evaluation workers to scale independently.
+LLMOps Studio was built around one practical goal:
+
+> **Make LLM changes measurable before they reach production.**
+
+The platform brings together:
+
+**Evaluation → Experiment Tracking → Regression Detection → Promotion Decisions**
+
+so model and prompt changes can be tested with measurable evidence instead of manual inspection alone.
 
 ---
 
-## Resume Story
+<div align="center">
 
-> Built an end-to-end LLM evaluation and regression platform using React, FastAPI, PostgreSQL, Redis, and Docker. Implemented versioned prompt templates, multi-provider LLM gateway (Groq, Gemini), hybrid evaluation engine (deterministic, semantic, LLM-as-a-Judge), experiment telemetry tracking, regression detection algorithms, explainable promotion gates, and fail-open Redis caching.
+### ⚡ Evaluate. Compare. Detect. Promote.
+
+</div>
+
