@@ -76,37 +76,14 @@ Dataset + Prompt + Model
 | 💾 | **Caching & Persistence** | PostgreSQL experiment storage with Redis dashboard caching |
 
 ## 🏗️ Architecture
+## 🏗️ Architecture
 
-```mermaid
-flowchart LR
-    U[👤 User] --> F[⚛️ React + TanStack Start]
+The platform follows an end-to-end evaluation pipeline connecting the web interface, FastAPI backend, async experiment runner, model providers, evaluation engine, telemetry, and regression gates.
 
-    F -->|REST / JSON| API[⚡ FastAPI]
+![LLMOps Studio Architecture](screenshots/Architecture.png)
 
-    API --> R[🚀 Async Experiment Runner]
-    API --> DB[(🐘 PostgreSQL)]
-    API --> C[(⚡ Redis Cache)]
+> **Flow:** User → Frontend → FastAPI → Experiment Runner → Model Gateway → Evaluation → Telemetry → Regression → Promotion Decision
 
-    R --> G[🔀 Model Gateway]
-
-    G --> GR[Groq]
-    G --> GE[Google Gemini]
-
-    R --> E[🧪 Evaluation Engine]
-
-    E --> D[Deterministic]
-    E --> S[TF-IDF Similarity]
-    E --> J[LLM-as-a-Judge]
-
-    R --> T[📊 Experiment Telemetry]
-
-    T --> DB
-
-    DB --> RG[🔍 Regression Service]
-    RG --> PG[🚦 Promotion Gate]
-
-    PG --> V{PASS / WARNING / FAIL}
-```
 ## 📸 Product Showcase
 
 ### 📊 Evaluation Dashboard
