@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { createDataset, listDatasets } from "@/api/datasets";
+import { createDataset, deleteDataset, listDatasets } from "@/api/datasets";
+import { DeleteConfirmDialog } from "@/components/common/DeleteConfirmDialog";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Pill } from "@/components/common/StatusBadge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -27,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCategory, formatDate } from "@/utils/format";
+import { formatCategory, formatDate, normalizeCategory } from "@/utils/format";
 import type { EvaluationCategory } from "@/types";
 
 export const Route = createFileRoute("/datasets/")({
@@ -51,11 +52,28 @@ function DatasetsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [cases, setCases] = useState("");
+  const [deletingDataset, setDeletingDataset] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["datasets"],
     queryFn: listDatasets,
   });
+
+  const handleDeleteDataset = async () => {
+    if (!deletingDataset) return;
+    setIsDeleting(true);
+    try {
+      await deleteDataset(deletingDataset.id);
+      toast.success("Dataset deleted successfully.");
+      void queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      setDeletingDataset(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete dataset.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const create = useMutation({
     mutationFn: () =>
@@ -71,7 +89,7 @@ function DatasetsPage() {
             return {
               input: input ?? line,
               expected_output: expected ?? "",
-              category: (category ?? "general") as EvaluationCategory,
+              category: normalizeCategory(category ?? "general") as EvaluationCategory,
               metadata: {},
             };
           }),
@@ -164,11 +182,20 @@ function DatasetsPage() {
                     <TableCell className="num text-right text-xs text-muted-foreground">
                       {formatDate(d.updated_at)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       <Button asChild variant="ghost" size="sm">
                         <Link to="/datasets/$datasetId" params={{ datasetId: d.id }}>
                           Open
                         </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 text-muted-foreground hover:text-destructive ml-1"
+                        onClick={() => setDeletingDataset({ id: d.id, name: d.name })}
+                        aria-label={`Delete dataset ${d.name}`}
+                      >
+                        <Trash2 className="size-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -178,6 +205,15 @@ function DatasetsPage() {
           </div>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={deletingDataset !== null}
+        onOpenChange={(open) => !open && setDeletingDataset(null)}
+        title={`Delete dataset "${deletingDataset?.name ?? ""}"?`}
+        description="This permanently removes this dataset and all associated test cases. This action cannot be undone."
+        onConfirm={handleDeleteDataset}
+        isDeleting={isDeleting}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">

@@ -1,5 +1,4 @@
-import { ApiError, notFound, request } from "./client";
-import { modelConfigurations, promptConfigurations } from "@/mocks/data";
+import { apiFetch } from "./client";
 import type {
   CreateModelConfigurationPayload,
   ModelConfiguration,
@@ -8,46 +7,47 @@ import type {
   PromptVersion,
 } from "@/types";
 
-const models: ModelConfiguration[] = [...modelConfigurations];
-const prompts: PromptConfiguration[] = promptConfigurations.map((p) => ({
-  ...p,
-  versions: [...p.versions],
-}));
-
 /** GET /api/v1/configurations/models */
 export function listModelConfigurations(): Promise<ModelConfiguration[]> {
-  return request("/configurations/models", () => [...models]);
+  return apiFetch<ModelConfiguration[]>("/configurations/models");
 }
 
 /** POST /api/v1/configurations/models */
 export function createModelConfiguration(
   payload: CreateModelConfigurationPayload,
 ): Promise<ModelConfiguration> {
-  return request("/configurations/models", () => {
-    if (!payload.name.trim()) throw new ApiError("Configuration name is required.", 422);
-    if (!payload.model.trim()) throw new ApiError("Model is required.", 422);
-    const created: ModelConfiguration = {
-      ...payload,
-      id: `mc-${Date.now().toString(36)}`,
-      created_at: new Date().toISOString(),
-    };
-    models.unshift(created);
-    return created;
+  return apiFetch<ModelConfiguration>("/configurations/models", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface UpdateModelConfigurationPayload {
+  name: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+}
+
+/** PUT /api/v1/configurations/models/{id} */
+export function updateModelConfiguration(
+  id: string,
+  payload: UpdateModelConfigurationPayload,
+): Promise<ModelConfiguration> {
+  return apiFetch<ModelConfiguration>(`/configurations/models/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 
 /** GET /api/v1/prompts */
 export function listPromptConfigurations(): Promise<PromptConfiguration[]> {
-  return request("/prompts", () => prompts.map((p) => ({ ...p, versions: [...p.versions] })));
+  return apiFetch<PromptConfiguration[]>("/prompts");
 }
 
 /** GET /api/v1/prompts/{id} */
 export function getPromptConfiguration(id: string): Promise<PromptConfiguration> {
-  return request(`/prompts/${id}`, () => {
-    const found = prompts.find((p) => p.id === id);
-    if (!found) notFound("Prompt configuration", id);
-    return { ...found, versions: [...found.versions] };
-  });
+  return apiFetch<PromptConfiguration>(`/prompts/${id}`);
 }
 
 export interface CreatePromptPayload {
@@ -62,30 +62,9 @@ export interface CreatePromptPayload {
 export function createPromptConfiguration(
   payload: CreatePromptPayload,
 ): Promise<PromptConfiguration> {
-  return request("/prompts", () => {
-    if (!payload.name.trim()) throw new ApiError("Prompt name is required.", 422);
-    if (!payload.system_prompt.trim()) throw new ApiError("System prompt is required.", 422);
-    const now = new Date().toISOString();
-    const id = `pc-${Date.now().toString(36)}`;
-    const created: PromptConfiguration = {
-      id,
-      name: payload.name,
-      status: payload.status,
-      latest_version: 1,
-      created_at: now,
-      versions: [
-        {
-          id: `${id}-v1`,
-          version: 1,
-          system_prompt: payload.system_prompt,
-          user_template: payload.user_template,
-          notes: payload.notes,
-          created_at: now,
-        },
-      ],
-    };
-    prompts.unshift(created);
-    return created;
+  return apiFetch<PromptConfiguration>("/prompts", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -94,21 +73,9 @@ export function createPromptVersion(
   promptId: string,
   payload: Omit<CreatePromptPayload, "name" | "status">,
 ): Promise<PromptVersion> {
-  return request(`/prompts/${promptId}/versions`, () => {
-    const prompt = prompts.find((p) => p.id === promptId);
-    if (!prompt) notFound("Prompt configuration", promptId);
-    const version = prompt.latest_version + 1;
-    const created: PromptVersion = {
-      id: `${promptId}-v${version}`,
-      version,
-      system_prompt: payload.system_prompt,
-      user_template: payload.user_template,
-      notes: payload.notes,
-      created_at: new Date().toISOString(),
-    };
-    prompt.versions = [...prompt.versions, created];
-    prompt.latest_version = version;
-    return created;
+  return apiFetch<PromptVersion>(`/prompts/${promptId}/versions`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -118,13 +85,36 @@ export function updatePromptVersion(
   version: number,
   payload: Omit<CreatePromptPayload, "name" | "status">,
 ): Promise<PromptVersion> {
-  return request(`/prompts/${promptId}/versions/${version}`, () => {
-    const prompt = prompts.find((p) => p.id === promptId);
-    if (!prompt) notFound("Prompt configuration", promptId);
-    const existing = prompt.versions.find((v) => v.version === version);
-    if (!existing) notFound("Prompt version", String(version));
-    const updated: PromptVersion = { ...existing, ...payload };
-    prompt.versions = prompt.versions.map((v) => (v.version === version ? updated : v));
-    return updated;
+  return apiFetch<PromptVersion>(`/prompts/${promptId}/versions/${version}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface UpdatePromptConfigurationPayload {
+  name: string;
+}
+
+/** PUT /api/v1/prompts/{id} */
+export function updatePromptConfiguration(
+  id: string,
+  payload: UpdatePromptConfigurationPayload,
+): Promise<PromptConfiguration> {
+  return apiFetch<PromptConfiguration>(`/prompts/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+/** DELETE /api/v1/configurations/models/{id} */
+export function deleteModelConfiguration(id: string): Promise<void> {
+  return apiFetch<void>(`/configurations/models/${id}`, {
+    method: "DELETE",
+  });
+}
+
+/** DELETE /api/v1/configurations/prompts/{id} */
+export function deletePromptConfiguration(id: string): Promise<void> {
+  return apiFetch<void>(`/configurations/prompts/${id}`, {
+    method: "DELETE",
   });
 }

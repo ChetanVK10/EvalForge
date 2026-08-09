@@ -327,7 +327,7 @@ export const modelConfigurations: ModelConfiguration[] = [
     id: "mc-gemini-flash",
     name: "Gemini Flash — Judge & Fallback",
     provider: "gemini",
-    model: "gemini-2.0-flash",
+    model: "gemini-3.6-flash",
     temperature: 0.1,
     max_tokens: 1536,
     created_at: "2026-06-08T09:10:00Z",
@@ -466,6 +466,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Support v4 — completeness rewrite",
     dataset_id: "ds-support",
     model_config_id: "mc-groq-70b",
+    model_config_name: "Groq Llama Production",
     prompt_id: "pc-support",
     prompt_version: 4,
     metrics: ["semantic_similarity", "llm_judge", "response_completeness", "keyword_match"],
@@ -475,6 +476,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1290,
     total_tokens: 214800,
     estimated_cost: 0.39,
+    result_status: "FAIL",
     regression_status: "FAIL",
     status: "completed",
     created_at: "2026-07-31T09:12:00Z",
@@ -496,6 +498,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Support v3 — production baseline",
     dataset_id: "ds-support",
     model_config_id: "mc-groq-70b",
+    model_config_name: "Groq Llama Production",
     prompt_id: "pc-support",
     prompt_version: 3,
     metrics: ["semantic_similarity", "llm_judge", "response_completeness", "keyword_match"],
@@ -505,6 +508,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1380,
     total_tokens: 198400,
     estimated_cost: 0.42,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-07-29T15:44:00Z",
@@ -526,6 +530,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Support v3 — Gemini cross-check",
     dataset_id: "ds-support",
     model_config_id: "mc-gemini-flash",
+    model_config_name: "Gemini Production",
     prompt_id: "pc-support",
     prompt_version: 3,
     metrics: ["semantic_similarity", "llm_judge", "keyword_match"],
@@ -535,6 +540,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1810,
     total_tokens: 205300,
     estimated_cost: 0.51,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-07-27T11:05:00Z",
@@ -556,6 +562,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Support v3 — 8B latency probe",
     dataset_id: "ds-support",
     model_config_id: "mc-groq-8b",
+    model_config_name: "Groq Llama 8B",
     prompt_id: "pc-support",
     prompt_version: 3,
     metrics: ["semantic_similarity", "llm_judge"],
@@ -565,6 +572,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 540,
     total_tokens: 176200,
     estimated_cost: 0.11,
+    result_status: "WARNING",
     regression_status: "WARNING",
     status: "completed",
     created_at: "2026-07-25T08:22:00Z",
@@ -586,6 +594,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Factuality v2 — grounding update",
     dataset_id: "ds-factuality",
     model_config_id: "mc-groq-70b",
+    model_config_name: "Groq Llama Production",
     prompt_id: "pc-factuality",
     prompt_version: 2,
     metrics: ["exact_match", "llm_judge", "semantic_similarity"],
@@ -595,6 +604,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1120,
     total_tokens: 121400,
     estimated_cost: 0.24,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-07-22T13:37:00Z",
@@ -616,6 +626,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Factuality v1 — baseline",
     dataset_id: "ds-factuality",
     model_config_id: "mc-groq-70b",
+    model_config_name: "Groq Llama Production",
     prompt_id: "pc-factuality",
     prompt_version: 1,
     metrics: ["exact_match", "llm_judge"],
@@ -625,6 +636,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1180,
     total_tokens: 118900,
     estimated_cost: 0.23,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-07-18T10:02:00Z",
@@ -646,6 +658,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Summarizer v3 — stakeholder tone",
     dataset_id: "ds-summary",
     model_config_id: "mc-gemini-flash",
+    model_config_name: "Gemini Production",
     prompt_id: "pc-summarizer",
     prompt_version: 3,
     metrics: ["semantic_similarity", "llm_judge", "response_completeness"],
@@ -655,6 +668,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 2210,
     total_tokens: 143600,
     estimated_cost: 0.36,
+    result_status: "WARNING",
     regression_status: "WARNING",
     status: "completed",
     created_at: "2026-07-15T16:48:00Z",
@@ -671,6 +685,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Summarizer v2 — structured fields",
     dataset_id: "ds-summary",
     model_config_id: "mc-gemini-flash",
+    model_config_name: "Gemini Production",
     prompt_id: "pc-summarizer",
     prompt_version: 2,
     metrics: ["semantic_similarity", "llm_judge"],
@@ -680,6 +695,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 2080,
     total_tokens: 138900,
     estimated_cost: 0.34,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-07-11T09:31:00Z",
@@ -696,6 +712,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Support v2 — next-step wording",
     dataset_id: "ds-support",
     model_config_id: "mc-groq-70b",
+    model_config_name: "Groq Llama Production",
     prompt_id: "pc-support",
     prompt_version: 2,
     metrics: ["semantic_similarity", "llm_judge"],
@@ -705,6 +722,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1410,
     total_tokens: 191200,
     estimated_cost: 0.41,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-07-04T14:19:00Z",
@@ -726,6 +744,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Support v1 — first baseline",
     dataset_id: "ds-support",
     model_config_id: "mc-groq-70b",
+    model_config_name: "Groq Llama Production",
     prompt_id: "pc-support",
     prompt_version: 1,
     metrics: ["semantic_similarity", "llm_judge"],
@@ -735,6 +754,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1490,
     total_tokens: 184700,
     estimated_cost: 0.4,
+    result_status: "WARNING",
     regression_status: "WARNING",
     status: "completed",
     created_at: "2026-06-26T10:55:00Z",
@@ -756,6 +776,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Factuality v1 — Gemini comparison",
     dataset_id: "ds-factuality",
     model_config_id: "mc-gemini-flash",
+    model_config_name: "Gemini Production",
     prompt_id: "pc-factuality",
     prompt_version: 1,
     metrics: ["exact_match", "llm_judge"],
@@ -765,6 +786,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 1560,
     total_tokens: 122800,
     estimated_cost: 0.29,
+    result_status: "PASS",
     regression_status: "PASS",
     status: "completed",
     created_at: "2026-06-19T12:08:00Z",
@@ -786,6 +808,7 @@ const experimentSeeds: ExperimentSeed[] = [
     name: "Summarizer v1 — draft check",
     dataset_id: "ds-summary",
     model_config_id: "mc-groq-8b",
+    model_config_name: "Groq Llama 8B",
     prompt_id: "pc-summarizer",
     prompt_version: 1,
     metrics: ["semantic_similarity"],
@@ -795,6 +818,7 @@ const experimentSeeds: ExperimentSeed[] = [
     p95_latency_ms: 690,
     total_tokens: 96400,
     estimated_cost: 0.08,
+    result_status: "WARNING",
     regression_status: "WARNING",
     status: "completed",
     created_at: "2026-06-12T08:44:00Z",
@@ -881,7 +905,7 @@ export function buildCaseResults(experimentId: string): EvaluationCaseResult[] {
   const rand = mulberry32(hashSeed(experimentId));
 
   return dataset.cases.map((c, idx) => {
-    const categoryScore = seed.category_scores[c.category] ?? seed.quality_score;
+    const categoryScore = seed.category_scores[c.category] ?? seed.quality_score ?? 80;
     const jitter = (rand() - 0.5) * 22;
     const raw = Math.max(28, Math.min(99.5, categoryScore + jitter));
     const score = round(raw, 1);
@@ -896,8 +920,10 @@ export function buildCaseResults(experimentId: string): EvaluationCaseResult[] {
           : "completeness"
       : "";
 
-    const latency = Math.round(seed.avg_latency_ms * (0.72 + rand() * 0.7) + (idx % 5) * 6);
-    const tokens = Math.round((seed.total_tokens / dataset.cases.length) * (0.8 + rand() * 0.45));
+    const avgLatency = seed.avg_latency_ms ?? 500;
+    const totalTokens = seed.total_tokens ?? 1000;
+    const latency = Math.round(avgLatency * (0.72 + rand() * 0.7) + (idx % 5) * 6);
+    const tokens = Math.round((totalTokens / dataset.cases.length) * (0.8 + rand() * 0.45));
 
     const metricScores: MetricResult[] = seed.metrics.map((m, i) => ({
       key: m,
@@ -950,7 +976,7 @@ export const settings: Settings = {
   evaluation_defaults: {
     default_metrics: ["semantic_similarity", "llm_judge", "response_completeness"],
     concurrency: 8,
-    judge_model: "gemini-2.0-flash",
+    judge_model: "gemini-3.6-flash",
   },
   regression_thresholds: {
     max_quality_regression_pct: 2,
@@ -970,7 +996,7 @@ export const settings: Settings = {
       provider: "gemini",
       label: "Google Gemini",
       configured: true,
-      models: ["gemini-2.0-flash", "gemini-2.0-pro", "gemini-1.5-flash"],
+      models: ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"],
     },
   ],
 };

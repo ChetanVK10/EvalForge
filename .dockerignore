@@ -1,0 +1,8 @@
+node_modules
+.output
+.git
+.gitignore
+.env
+backend/.venv
+backend/__pycache__
+backend/.pytest_cache

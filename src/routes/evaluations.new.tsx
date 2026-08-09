@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { METRIC_OPTIONS } from "@/utils/format";
-import type { EvaluationProgress, MetricKey } from "@/types";
+import type { EvaluationProgress, MetricKey, PromptVersion } from "@/types";
 
 export const Route = createFileRoute("/evaluations/new")({
   head: () => ({
@@ -31,11 +31,92 @@ export const Route = createFileRoute("/evaluations/new")({
   component: NewEvaluationPage,
 });
 
+function truncateText(text: string, maxLen = 28): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLen) return trimmed;
+  return `${trimmed.slice(0, maxLen).trimEnd()}…`;
+}
+
+function formatFullVersionLabel(v: PromptVersion, latestVersion: number): string {
+  const isLatest = v.version === latestVersion;
+  const notesLower = (v.notes || "").toLowerCase();
+
+  let desc = "";
+  if (notesLower.includes("baseline")) {
+    desc = "Baseline";
+  } else if (notesLower.includes("candidate")) {
+    desc = isLatest ? "Candidate (Latest)" : "Candidate";
+  } else if (v.notes && v.notes.trim()) {
+    desc = isLatest && !notesLower.includes("latest") ? `${v.notes.trim()} (Latest)` : v.notes.trim();
+  } else if (v.version === 1) {
+    desc = "Baseline";
+  } else if (isLatest) {
+    desc = "Candidate (Latest)";
+  } else {
+    desc = `Version ${v.version}`;
+  }
+
+  return `v${v.version} — ${desc}`;
+}
+
+function formatVersionLabel(v: PromptVersion, latestVersion: number): string {
+  const isLatest = v.version === latestVersion;
+  const notesLower = (v.notes || "").toLowerCase();
+
+  let desc = "";
+  if (notesLower.includes("baseline")) {
+    desc = "Baseline";
+  } else if (notesLower.includes("candidate")) {
+    desc = isLatest ? "Candidate (Latest)" : "Candidate";
+  } else if (v.notes && v.notes.trim()) {
+    const trimmedNotes = v.notes.trim();
+    const conciseNotes = truncateText(trimmedNotes, 28);
+    desc =
+      isLatest && !notesLower.includes("latest") && conciseNotes === trimmedNotes
+        ? `${conciseNotes} (Latest)`
+        : conciseNotes;
+  } else if (v.version === 1) {
+    desc = "Baseline";
+  } else if (isLatest) {
+    desc = "Candidate (Latest)";
+  } else {
+    desc = `Version ${v.version}`;
+  }
+
+  return `v${v.version} — ${desc}`;
+}
+
+function formatVersionIndicator(v: PromptVersion, latestVersion: number): string {
+  const isLatest = v.version === latestVersion;
+  const notesLower = (v.notes || "").toLowerCase();
+
+  if (notesLower.includes("baseline")) {
+    return `v${v.version} — Baseline`;
+  }
+  if (notesLower.includes("candidate")) {
+    return isLatest ? `v${v.version} — Latest candidate` : `v${v.version} — Candidate`;
+  }
+  if (v.notes && v.notes.trim()) {
+    return isLatest && !notesLower.includes("latest")
+      ? `v${v.version} — ${v.notes.trim()} (Latest candidate)`
+      : `v${v.version} — ${v.notes.trim()}`;
+  }
+  if (v.version === 1) {
+    return `v${v.version} — Baseline`;
+  }
+  if (isLatest) {
+    return `v${v.version} — Latest candidate`;
+  }
+  return `v${v.version}`;
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-border py-2 last:border-0">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="num text-sm font-medium">{value}</span>
+    <div className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-0 min-w-0">
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <span className="num text-sm font-medium text-right truncate min-w-0" title={value}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -47,10 +128,10 @@ function NewEvaluationPage() {
   const prompts = useQuery({ queryKey: ["prompt-configs"], queryFn: listPromptConfigurations });
 
   const [name, setName] = useState("Support v5 — candidate run");
-  const [datasetId, setDatasetId] = useState("ds-support");
-  const [modelId, setModelId] = useState("mc-groq-70b");
-  const [promptId, setPromptId] = useState("pc-support");
-  const [version, setVersion] = useState(4);
+  const [datasetId, setDatasetId] = useState("");
+  const [modelId, setModelId] = useState("");
+  const [promptId, setPromptId] = useState("");
+  const [version, setVersion] = useState<number | null>(null);
   const [metrics, setMetrics] = useState<MetricKey[]>([
     "semantic_similarity",
     "llm_judge",
@@ -62,9 +143,25 @@ function NewEvaluationPage() {
   const loading = datasets.isLoading || models.isLoading || prompts.isLoading;
   const failed = datasets.isError || models.isError || prompts.isError;
 
-  const dataset = datasets.data?.find((d) => d.id === datasetId);
-  const model = models.data?.find((m) => m.id === modelId);
-  const prompt = prompts.data?.find((p) => p.id === promptId);
+  const dataset = (datasetId ? datasets.data?.find((d) => d.id === datasetId) : undefined) ?? datasets.data?.[0];
+  const model = (modelId ? models.data?.find((m) => m.id === modelId) : undefined) ?? models.data?.[0];
+  const prompt = (promptId ? prompts.data?.find((p) => p.id === promptId) : undefined) ?? prompts.data?.[0];
+
+  const effectiveDatasetId = dataset?.id ?? datasetId;
+  const effectiveModelId = model?.id ?? modelId;
+  const effectivePromptId = prompt?.id ?? promptId;
+
+  const sortedVersions = prompt?.versions ? [...prompt.versions].sort((a, b) => a.version - b.version) : [];
+  const latestVersion = prompt?.latest_version ?? (sortedVersions[sortedVersions.length - 1]?.version ?? 1);
+
+  const effectiveVersion =
+    version !== null && sortedVersions.some((v) => v.version === version)
+      ? version
+      : latestVersion;
+
+  const selectedVersionObj =
+    sortedVersions.find((v) => v.version === effectiveVersion) ??
+    sortedVersions[sortedVersions.length - 1];
 
   const start = async () => {
     setRunning(true);
@@ -72,10 +169,10 @@ function NewEvaluationPage() {
       const experiment = await runEvaluation(
         {
           name,
-          dataset_id: datasetId,
-          model_config_id: modelId,
-          prompt_id: promptId,
-          prompt_version: version,
+          dataset_id: effectiveDatasetId,
+          model_config_id: effectiveModelId,
+          prompt_id: effectivePromptId,
+          prompt_version: effectiveVersion,
           metrics,
         },
         setProgress,
@@ -112,69 +209,85 @@ function NewEvaluationPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label htmlFor="ev-dataset">Dataset</Label>
               <select
                 id="ev-dataset"
-                className="h-9 w-full rounded-sm border border-input bg-transparent px-3 text-sm"
-                value={datasetId}
+                className="h-9 w-full min-w-0 max-w-full rounded-sm border border-input bg-transparent px-3 pr-8 text-sm truncate cursor-pointer"
+                value={effectiveDatasetId}
                 onChange={(e) => setDatasetId(e.target.value)}
               >
                 {datasets.data?.map((d) => (
-                  <option key={d.id} value={d.id}>
+                  <option key={d.id} value={d.id} title={d.name}>
                     {d.name}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label htmlFor="ev-model">Model configuration</Label>
               <select
                 id="ev-model"
-                className="h-9 w-full rounded-sm border border-input bg-transparent px-3 text-sm"
-                value={modelId}
+                className="h-9 w-full min-w-0 max-w-full rounded-sm border border-input bg-transparent px-3 pr-8 text-sm truncate cursor-pointer"
+                value={effectiveModelId}
                 onChange={(e) => setModelId(e.target.value)}
               >
                 {models.data?.map((m) => (
-                  <option key={m.id} value={m.id}>
+                  <option key={m.id} value={m.id} title={m.name}>
                     {m.name}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label htmlFor="ev-prompt">Prompt configuration</Label>
               <select
                 id="ev-prompt"
-                className="h-9 w-full rounded-sm border border-input bg-transparent px-3 text-sm"
-                value={promptId}
+                className="h-9 w-full min-w-0 max-w-full rounded-sm border border-input bg-transparent px-3 pr-8 text-sm truncate cursor-pointer"
+                value={effectivePromptId}
                 onChange={(e) => {
-                  setPromptId(e.target.value);
-                  const p = prompts.data?.find((x) => x.id === e.target.value);
-                  setVersion(p?.latest_version ?? 1);
+                  const nextPromptId = e.target.value;
+                  setPromptId(nextPromptId);
+                  const p = prompts.data?.find((x) => x.id === nextPromptId);
+                  if (p) {
+                    setVersion(p.latest_version);
+                  } else {
+                    setVersion(null);
+                  }
                 }}
               >
                 {prompts.data?.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id} value={p.id} title={p.name}>
                     {p.name}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label htmlFor="ev-version">Prompt version</Label>
               <select
                 id="ev-version"
-                className="h-9 w-full rounded-sm border border-input bg-transparent px-3 text-sm"
-                value={version}
+                className="h-9 w-full min-w-0 max-w-full rounded-sm border border-input bg-transparent px-3 pr-8 text-sm truncate cursor-pointer"
+                value={effectiveVersion}
                 onChange={(e) => setVersion(Number(e.target.value))}
+                title={selectedVersionObj ? formatFullVersionLabel(selectedVersionObj, latestVersion) : undefined}
+                aria-label="Prompt version"
               >
-                {prompt?.versions.map((v) => (
-                  <option key={v.id} value={v.version}>
-                    v{v.version} — {v.notes}
+                {sortedVersions.map((v) => (
+                  <option
+                    key={v.id}
+                    value={v.version}
+                    title={formatFullVersionLabel(v, latestVersion)}
+                  >
+                    {formatVersionLabel(v, latestVersion)}
                   </option>
                 ))}
               </select>
+              {selectedVersionObj && (
+                <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words leading-relaxed">
+                  {formatVersionIndicator(selectedVersionObj, latestVersion)}
+                </p>
+              )}
             </div>
           </div>
 
@@ -211,7 +324,7 @@ function NewEvaluationPage() {
             <Row label="Number of cases" value={String(dataset?.case_count ?? 0)} />
             <Row label="Provider" value={model?.provider ?? "—"} />
             <Row label="Model" value={model?.model ?? "—"} />
-            <Row label="Prompt version" value={`${prompt?.name ?? ""} v${version}`} />
+            <Row label="Prompt version" value={`${prompt?.name ?? ""} v${effectiveVersion}`} />
             <Row label="Selected metrics" value={String(metrics.length)} />
           </div>
 
@@ -232,3 +345,4 @@ function NewEvaluationPage() {
     </div>
   );
 }
+

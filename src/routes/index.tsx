@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Activity, CircleDollarSign, FlaskConical, Gauge, ShieldCheck, Timer } from "lucide-react";
+import { FlaskConical, Gauge, ShieldCheck, Timer } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -19,7 +19,15 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/common/States
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ExperimentTable } from "@/components/experiments/ExperimentTable";
 import { Button } from "@/components/ui/button";
-import { formatCost, formatDateTime, formatLatency, formatPercent } from "@/utils/format";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatDateTime, formatLatency, formatPercent } from "@/utils/format";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,12 +36,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Evaluation health overview: quality, latency, cost and regression pass rate across LLM experiments.",
+          "Evaluation health overview: quality, latency and regression pass rate across LLM experiments.",
       },
       { property: "og:title", content: "Dashboard — LLMOps Studio" },
       {
         property: "og:description",
-        content: "Quality, latency, cost and regression status across your LLM experiments.",
+        content: "Quality, latency and regression status across your LLM experiments.",
       },
     ],
   }),
@@ -59,7 +67,7 @@ function ChartCard({
   return (
     <div className="panel p-4">
       <SectionHeader title={title} description={subtitle} />
-      <div className="mt-4 h-[180px]">
+      <div className="mt-4 h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
           {children as React.ReactElement}
         </ResponsiveContainer>
@@ -89,7 +97,7 @@ function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Evaluation Overview"
-        description="Quality, latency, cost and regression health across every LLM experiment in this workspace."
+        description="Quality, latency and regression health across LLM experiments."
         actions={
           <>
             <Button asChild variant="outline" size="sm">
@@ -107,36 +115,22 @@ function DashboardPage() {
 
       {data && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              label="Total Experiments"
+              label="Evaluation Runs"
               value={String(data.total_experiments)}
               hint="all time"
               icon={FlaskConical}
             />
             <MetricCard
-              label="Evaluations This Week"
-              value={String(data.evaluations_this_week)}
-              hint="last 7 days"
-              icon={Activity}
-            />
-            <MetricCard
-              label="Avg Quality Score"
+              label="Avg Quality"
               value={formatPercent(data.avg_quality_score)}
               icon={Gauge}
-              delta={{ value: "2.7%", direction: "down", good: false }}
             />
             <MetricCard
               label="Avg Latency"
               value={formatLatency(data.avg_latency_ms)}
               icon={Timer}
-              delta={{ value: "7.3%", direction: "down", good: true }}
-            />
-            <MetricCard
-              label="Estimated Cost"
-              value={formatCost(data.estimated_cost)}
-              hint="cumulative"
-              icon={CircleDollarSign}
             />
             <MetricCard
               label="Regression Pass Rate"
@@ -145,7 +139,7 @@ function DashboardPage() {
             />
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-3">
+          <div className="grid gap-3 lg:grid-cols-2">
             <ChartCard title="Quality Score Over Time" subtitle="overall score per run">
               <AreaChart data={data.quality_over_time}>
                 <defs>
@@ -183,72 +177,90 @@ function DashboardPage() {
                 />
               </LineChart>
             </ChartCard>
-
-            <ChartCard title="Estimated Cost Over Time" subtitle="USD per run">
-              <LineChart data={data.cost_over_time}>
-                <CartesianGrid stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="date" {...axis} />
-                <YAxis width={38} {...axis} />
-                <Tooltip {...tooltipStyle} />
-                <Line
-                  type="monotone"
-                  dataKey="cost"
-                  stroke="var(--color-chart-2)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ChartCard>
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-[2fr_1fr]">
-            <div className="panel">
-              <div className="border-b border-border p-4">
-                <SectionHeader
-                  title="Recent Experiments"
-                  description="latest evaluation runs"
-                  actions={
-                    <Button asChild variant="ghost" size="sm">
-                      <Link to="/experiments">View all</Link>
-                    </Button>
-                  }
-                />
-              </div>
-              {data.recent_experiments.length === 0 ? (
-                <EmptyState title="No experiments yet" className="m-4" />
-              ) : (
-                <ExperimentTable experiments={data.recent_experiments} compact />
-              )}
+          <div className="panel">
+            <div className="border-b border-border p-4">
+              <SectionHeader
+                title="Recent Experiments"
+                description="latest evaluation runs"
+                actions={
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/experiments">View all</Link>
+                  </Button>
+                }
+              />
             </div>
+            {data.recent_experiments.length === 0 ? (
+              <EmptyState title="No experiments yet" className="m-4" />
+            ) : (
+              <ExperimentTable experiments={data.recent_experiments} compact />
+            )}
+          </div>
 
-            <div className="panel">
-              <div className="border-b border-border p-4">
-                <SectionHeader
-                  title="Recent Regression Alerts"
-                  description="threshold breaches and warnings"
-                />
-              </div>
-              <ul className="divide-y divide-border">
-                {data.alerts.map((a) => (
-                  <li key={a.id} className="space-y-2 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <StatusBadge status={a.severity} />
-                      <span className="num text-[11px] text-muted-foreground">
-                        {formatDateTime(a.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed">{a.message}</p>
-                    <Link
-                      to="/experiments/$experimentId"
-                      params={{ experimentId: a.experiment_id }}
-                      className="num text-xs text-primary hover:underline"
-                    >
-                      {a.experiment_id} →
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          <div className="panel">
+            <div className="border-b border-border p-4">
+              <SectionHeader
+                title="Recent Regression Activity"
+                description="threshold breaches and warnings"
+                actions={
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/regression">View all</Link>
+                  </Button>
+                }
+              />
             </div>
+            {data.alerts.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                No recent regression alerts
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-28">Status</TableHead>
+                      <TableHead>Experiment</TableHead>
+                      <TableHead>Alert</TableHead>
+                      <TableHead className="text-right">Created</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.alerts.slice(0, 5).map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell>
+                          <StatusBadge status={a.severity} />
+                        </TableCell>
+                        <TableCell className="font-medium text-sm">
+                          <Link
+                            to="/experiments/$experimentId"
+                            params={{ experimentId: a.experiment_id }}
+                            className="hover:text-primary hover:underline"
+                          >
+                            {a.experiment_id}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm">{a.message}</TableCell>
+                        <TableCell className="num text-right text-xs text-muted-foreground">
+                          {formatDateTime(a.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link
+                              to="/experiments/$experimentId"
+                              params={{ experimentId: a.experiment_id }}
+                            >
+                              View
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
         </>
       )}

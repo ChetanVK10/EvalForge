@@ -1,9 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { addCase, deleteCase, getDataset, importJsonl, updateCase } from "@/api/datasets";
+import {
+  addCase,
+  deleteCase,
+  deleteDataset,
+  getDataset,
+  importJsonl,
+  updateCase,
+  updateDataset,
+} from "@/api/datasets";
+import { DeleteConfirmDialog } from "@/components/common/DeleteConfirmDialog";
 import { MetricCard } from "@/components/common/MetricCard";
 import { PageHeader, SectionHeader } from "@/components/common/PageHeader";
 import { Pill } from "@/components/common/StatusBadge";
@@ -27,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCategory, formatDate, truncate } from "@/utils/format";
+import { formatCategory, formatDate, STANDARD_CATEGORIES, truncate } from "@/utils/format";
 import type { EvaluationCase, EvaluationCategory } from "@/types";
 
 export const Route = createFileRoute("/datasets/$datasetId")({
@@ -42,25 +51,17 @@ export const Route = createFileRoute("/datasets/$datasetId")({
   component: DatasetDetailPage,
 });
 
-const CATEGORIES: EvaluationCategory[] = [
-  "factuality",
-  "reasoning",
-  "summarization",
-  "customer-support",
-  "instruction-following",
-  "safety",
-  "billing",
-  "technical",
-  "account-management",
-  "general",
-];
-
 function DatasetDetailPage() {
   const { datasetId } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState<EvaluationCase | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editDatasetOpen, setEditDatasetOpen] = useState(false);
+  const [datasetForm, setDatasetForm] = useState({ name: "", description: "" });
   const [form, setForm] = useState({
     input: "",
     expected_output: "",
@@ -71,6 +72,37 @@ function DatasetDetailPage() {
     queryKey: ["dataset", datasetId],
     queryFn: () => getDataset(datasetId),
   });
+
+  const updateDatasetMutation = useMutation({
+    mutationFn: () => {
+      if (!datasetForm.name.trim()) throw new Error("Dataset name is required.");
+      return updateDataset(datasetId, {
+        name: datasetForm.name.trim(),
+        description: datasetForm.description.trim(),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Dataset updated successfully.");
+      setEditDatasetOpen(false);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleDeleteDataset = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteDataset(datasetId);
+      toast.success("Dataset deleted successfully.");
+      void queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      void navigate({ to: "/datasets" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete dataset.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
@@ -137,6 +169,20 @@ function DatasetDetailPage() {
                 e.target.value = "";
               }}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!data) return;
+                setDatasetForm({
+                  name: data.name,
+                  description: data.description ?? "",
+                });
+                setEditDatasetOpen(true);
+              }}
+            >
+              <Pencil className="size-4" /> Edit Dataset
+            </Button>
             <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
               <Upload className="size-4" /> Import JSONL
             </Button>
@@ -149,6 +195,14 @@ function DatasetDetailPage() {
               }}
             >
               <Plus className="size-4" /> Add Case
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="mr-1.5 size-3.5" /> Delete Dataset
             </Button>
           </>
         }
@@ -291,9 +345,9 @@ function DatasetDetailPage() {
                   setForm({ ...form, category: e.target.value as EvaluationCategory })
                 }
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {formatCategory(c)}
+                {STANDARD_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
                   </option>
                 ))}
               </select>
@@ -309,6 +363,53 @@ function DatasetDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={editDatasetOpen} onOpenChange={setEditDatasetOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Dataset</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="ds-name">Dataset name</Label>
+              <Input
+                id="ds-name"
+                value={datasetForm.name}
+                onChange={(e) => setDatasetForm({ ...datasetForm, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ds-desc">Description</Label>
+              <Textarea
+                id="ds-desc"
+                rows={4}
+                value={datasetForm.description}
+                onChange={(e) => setDatasetForm({ ...datasetForm, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDatasetOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateDatasetMutation.mutate()}
+              disabled={updateDatasetMutation.isPending}
+            >
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title={`Delete dataset "${data?.name ?? ""}"?`}
+        description="This permanently removes this dataset and all associated test cases. This action cannot be undone."
+        onConfirm={handleDeleteDataset}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

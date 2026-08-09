@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -11,7 +13,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getExperimentResult } from "@/api/experiments";
+import { deleteExperiment, getExperimentResult } from "@/api/experiments";
+import { DeleteConfirmDialog } from "@/components/common/DeleteConfirmDialog";
 import { MetricCard } from "@/components/common/MetricCard";
 import { PageHeader, SectionHeader } from "@/components/common/PageHeader";
 import { ProviderBadge } from "@/components/common/ProviderBadge";
@@ -29,7 +32,6 @@ import {
 } from "@/components/ui/table";
 import {
   formatCategory,
-  formatCost,
   formatDateTime,
   formatLatency,
   formatPercent,
@@ -62,12 +64,32 @@ const axis = {
 
 function ExperimentResultsPage() {
   const { experimentId } = Route.useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [active, setActive] = useState<EvaluationCaseResult | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["experiment-result", experimentId],
     queryFn: () => getExperimentResult(experimentId),
   });
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteExperiment(experimentId);
+      toast.success("Experiment deleted successfully.");
+      void queryClient.invalidateQueries({ queryKey: ["experiments"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void navigate({ to: "/experiments" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete experiment.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
 
   if (isLoading) return <LoadingState variant="cards" rows={6} />;
   if (isError)
@@ -82,11 +104,22 @@ function ExperimentResultsPage() {
         title={e.name}
         description={`${e.dataset_name} · ${e.prompt_name} v${e.prompt_version}`}
         actions={
-          <Button asChild variant="outline" size="sm">
-            <Link to="/regression" search={{ candidate: e.id }}>
-              Compare for regressions
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/regression" search={{ candidate: e.id }}>
+                Compare for regressions
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="mr-1.5 size-3.5" />
+              Delete
+            </Button>
+          </div>
         }
       />
 
@@ -95,18 +128,18 @@ function ExperimentResultsPage() {
         <span className="num text-xs text-muted-foreground">{formatDateTime(e.created_at)}</span>
         <ProviderBadge provider={e.provider} />
         <span className="num text-xs">{e.model}</span>
+        <span className="text-xs text-muted-foreground">Prompt: <span className="font-medium text-foreground">{e.prompt_name}</span></span>
         <Pill tone="info">v{e.prompt_version}</Pill>
         <RunStatusBadge status={e.status} />
-        <StatusBadge status={e.regression_status} />
+        <StatusBadge status={e.result_status || e.regression_status} />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Overall Quality" value={formatPercent(e.quality_score)} />
         <MetricCard label="Pass Rate" value={formatPercent(e.pass_rate)} />
         <MetricCard label="Avg Latency" value={formatLatency(e.avg_latency_ms)} />
         <MetricCard label="P95 Latency" value={formatLatency(e.p95_latency_ms)} />
         <MetricCard label="Total Tokens" value={formatTokens(e.total_tokens)} />
-        <MetricCard label="Estimated Cost" value={formatCost(e.estimated_cost)} />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
@@ -153,11 +186,13 @@ function ExperimentResultsPage() {
                     <Cell
                       key={c.key}
                       fill={
-                        c.score >= 90
-                          ? "var(--color-chart-2)"
-                          : c.score >= 85
-                            ? "var(--color-chart-1)"
-                            : "var(--color-chart-4)"
+                        c.score == null
+                          ? "var(--color-border)"
+                          : c.score >= 90
+                            ? "var(--color-chart-2)"
+                            : c.score >= 85
+                              ? "var(--color-chart-1)"
+                              : "var(--color-chart-4)"
                       }
                     />
                   ))}
@@ -217,7 +252,10 @@ function ExperimentResultsPage() {
                   </TableCell>
                   <TableCell className="num text-right text-sm">{formatTokens(c.tokens)}</TableCell>
                   <TableCell>
-                    <StatusBadge status={c.status} />
+                    <div className="flex items-center gap-1.5">
+                      <StatusBadge status={c.status} />
+                      {c.execution_status === "failed" && <Pill tone="fail">Error</Pill>}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -230,6 +268,15 @@ function ExperimentResultsPage() {
         caseResult={active}
         open={active !== null}
         onOpenChange={(o) => !o && setActive(null)}
+      />
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title={`Delete experiment "${e.name}"?`}
+        description="This permanently removes this experiment and its evaluation results. This action cannot be undone."
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
       />
     </div>
   );

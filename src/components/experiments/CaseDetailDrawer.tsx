@@ -1,4 +1,4 @@
-import { StatusBadge } from "@/components/common/StatusBadge";
+import { Pill, StatusBadge } from "@/components/common/StatusBadge";
 import {
   Sheet,
   SheetContent,
@@ -37,6 +37,11 @@ export function CaseDetailDrawer({
             <SheetHeader className="space-y-2">
               <div className="flex items-center gap-2">
                 <StatusBadge status={caseResult.status} />
+                {caseResult.execution_status === "failed" ? (
+                  <Pill tone="fail">Execution Error</Pill>
+                ) : (
+                  <Pill tone="pass">Execution OK</Pill>
+                )}
                 <span className="num text-xs text-muted-foreground">{caseResult.case_id}</span>
               </div>
               <SheetTitle className="text-base">
@@ -87,7 +92,20 @@ export function CaseDetailDrawer({
                 </div>
               )}
 
-              <Field label="LLM judge explanation">{caseResult.judge_explanation}</Field>
+              {caseResult.metric_diagnostics && caseResult.metric_diagnostics.length > 0 && (
+                <div>
+                  <p className="label-caps mb-1.5">Metric diagnostics</p>
+                  <div className="space-y-1 rounded-sm border border-border bg-muted/40 p-3 text-sm leading-relaxed">
+                    {caseResult.metric_diagnostics.map((diag, i) => (
+                      <p key={i}>{diag}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {caseResult.judge_explanation && caseResult.judge_explanation.trim().length > 0 && (
+                <Field label="LLM judge explanation">{caseResult.judge_explanation}</Field>
+              )}
             </div>
           </>
         )}

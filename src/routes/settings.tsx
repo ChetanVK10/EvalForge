@@ -234,15 +234,16 @@ function SettingsPage() {
               >
                 <option value="llama-3.3-70b-versatile">Groq: llama-3.3-70b-versatile</option>
                 <option value="llama-3.1-8b-instant">Groq: llama-3.1-8b-instant</option>
-                <option value="gemini-2.5-flash">Gemini: gemini-2.5-flash</option>
-                <option value="gemini-2.5-pro">Gemini: gemini-2.5-pro</option>
+                <option value="gemini-3.6-flash">Gemini: gemini-3.6-flash</option>
+                <option value="gemini-3.5-flash">Gemini: gemini-3.5-flash</option>
+                <option value="gemini-3.5-flash-lite">Gemini: gemini-3.5-flash-lite</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
               <div className="flex justify-between text-sm">
                 <label htmlFor="concurrency-range" className="font-semibold">
-                  Execution Concurrency
+                  Evaluation Concurrency
                 </label>
                 <span className="num font-mono">{evalDefaults.concurrency} concurrent cases</span>
               </div>
@@ -281,7 +282,7 @@ function SettingsPage() {
           </Button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
             <label htmlFor="max-quality-reg" className="text-sm font-medium">
               Max Quality Regression (%)
@@ -342,27 +343,6 @@ function SettingsPage() {
             />
             <p className="text-xs text-muted-foreground">
               Maximum allowable percentage increase in average response latency.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="max-cost-inc" className="text-sm font-medium">
-              Max Cost Increase (%)
-            </label>
-            <Input
-              id="max-cost-inc"
-              type="number"
-              step="1"
-              value={thresholds.max_cost_increase_pct}
-              onChange={(e) =>
-                setThresholds((prev) => ({
-                  ...prev,
-                  max_cost_increase_pct: Number(e.target.value),
-                }))
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Maximum allowable percentage increase in estimated token cost.
             </p>
           </div>
         </div>

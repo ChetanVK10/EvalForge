@@ -194,3 +194,43 @@
   text-transform: uppercase;
   color: var(--color-muted-foreground);
 }
+
+/*
+ * Native select/option dark-theme fix.
+ * CSS cannot style <option> backgrounds reliably cross-browser in dark mode,
+ * so we force the native picker to use dark colors explicitly.
+ */
+select {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  border-color: var(--color-border);
+}
+
+select option {
+  background-color: var(--color-popover);
+  color: var(--color-popover-foreground);
+}
+
+select option:checked,
+select option:focus {
+  background-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+select option:disabled {
+  color: var(--color-muted-foreground);
+  opacity: 0.5;
+}
+
+/* Dark mode overrides using explicit hex-compatible fallbacks for browser native pickers */
+.dark select {
+  background-color: oklch(0.235 0.014 260);
+  color: oklch(0.93 0.008 250);
+  border-color: oklch(0.31 0.014 260);
+  color-scheme: dark;
+}
+
+.dark select option {
+  background-color: oklch(0.235 0.014 260);
+  color: oklch(0.93 0.008 250);
+}

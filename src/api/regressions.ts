@@ -1,8 +1,4 @@
-import { ApiError, notFound, request } from "./client";
-import { computeComparison } from "@/lib/regression";
-import { getCaseResults, getCategoryScores, getMetricBreakdown } from "@/mocks/data";
-import { getExperiment } from "./experiments";
-import { getRegressionThresholds } from "./settings";
+import { apiFetch } from "./client";
 import type { RegressionComparison } from "@/types";
 
 export interface CompareRequest {
@@ -11,43 +7,17 @@ export interface CompareRequest {
 }
 
 /** POST /api/v1/regressions/compare */
-export async function compareExperiments({
-  baseline_experiment_id,
-  candidate_experiment_id,
-}: CompareRequest): Promise<RegressionComparison> {
-  if (baseline_experiment_id === candidate_experiment_id) {
-    throw new ApiError("Baseline and candidate must be different experiments.", 422);
+export function compareExperiments(payload: CompareRequest): Promise<RegressionComparison> {
+  if (!payload.baseline_experiment_id || !payload.candidate_experiment_id) {
+    return Promise.reject(new Error("Both baseline and candidate experiments must be selected."));
   }
-  const [baseline, candidate, thresholds] = await Promise.all([
-    getExperiment(baseline_experiment_id),
-    getExperiment(candidate_experiment_id),
-    getRegressionThresholds(),
-  ]);
 
-  return request("/regressions/compare", () => {
-    if (baseline.dataset_id !== candidate.dataset_id) {
-      throw new ApiError(
-        "Experiments must run on the same dataset to be compared for regressions.",
-        422,
-      );
-    }
-    if (!baseline || !candidate) notFound("Experiment", baseline_experiment_id);
-    return computeComparison({
-      baseline,
-      candidate,
-      baselineBreakdown: getMetricBreakdown(baseline.id),
-      candidateBreakdown: getMetricBreakdown(candidate.id),
-      baselineCategories: getCategoryScores(baseline.id),
-      candidateCategories: getCategoryScores(candidate.id),
-      baselineCases: getCaseResults(baseline.id),
-      candidateCases: getCaseResults(candidate.id),
-      thresholds,
-    });
+  if (payload.baseline_experiment_id === payload.candidate_experiment_id) {
+    return Promise.reject(new Error("Baseline and candidate must be different experiments."));
+  }
+
+  return apiFetch<RegressionComparison>("/regressions/compare", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
-
-/** The demo scenario surfaced by default on the Regression page. */
-export const DEFAULT_COMPARISON: CompareRequest = {
-  baseline_experiment_id: "exp-013",
-  candidate_experiment_id: "exp-014",
-};

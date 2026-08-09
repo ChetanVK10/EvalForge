@@ -81,7 +81,7 @@ export interface PromptConfiguration {
 export interface MetricResult {
   key: MetricKey | string;
   label: string;
-  score: number;
+  score: number | null;
 }
 
 export interface Experiment {
@@ -90,18 +90,26 @@ export interface Experiment {
   dataset_id: string;
   dataset_name: string;
   model_config_id: string;
+  model_config_name: string;
   provider: Provider;
   model: string;
   prompt_id: string;
   prompt_name: string;
   prompt_version: number;
   metrics: MetricKey[];
-  quality_score: number;
-  pass_rate: number;
-  avg_latency_ms: number;
-  p95_latency_ms: number;
-  total_tokens: number;
-  estimated_cost: number;
+  /** null when the experiment failed before producing any scored results */
+  quality_score: number | null;
+  /** null when the experiment failed before producing any scored results */
+  pass_rate: number | null;
+  /** null when no model calls completed */
+  avg_latency_ms: number | null;
+  /** null when no model calls completed */
+  p95_latency_ms: number | null;
+  /** null when no model calls completed */
+  total_tokens: number | null;
+  /** null when model pricing is unavailable or cost cannot be calculated */
+  estimated_cost: number | null;
+  result_status: RegressionStatus;
   regression_status: RegressionStatus;
   status: ExperimentStatus;
   created_at: string;
@@ -112,15 +120,21 @@ export interface EvaluationCaseResult {
   case_id: string;
   input: string;
   expected_output: string;
+  /** empty string when execution_status === 'failed' */
   model_output: string;
   category: EvaluationCategory;
-  score: number;
-  latency_ms: number;
-  tokens: number;
+  /** null when execution_status === 'failed' and no score was produced */
+  score: number | null;
+  /** null when execution_status === 'failed' and the call never completed */
+  latency_ms: number | null;
+  /** null when execution_status === 'failed' and no tokens were consumed */
+  tokens: number | null;
+  execution_status?: "completed" | "failed";
   status: CaseStatus;
   metric_scores: MetricResult[];
   failure_reason: string | null;
   judge_explanation: string;
+  metric_diagnostics?: string[];
 }
 
 export interface ExperimentResult {
@@ -222,7 +236,8 @@ export interface CreateEvaluationPayload {
   dataset_id: string;
   model_config_id: string;
   prompt_id: string;
-  prompt_version: number;
+  prompt_version?: number;
+  prompt_version_id?: string;
   metrics: MetricKey[];
 }
 
@@ -236,10 +251,14 @@ export interface EvaluationProgress {
 export interface DashboardSummary {
   total_experiments: number;
   evaluations_this_week: number;
-  avg_quality_score: number;
-  avg_latency_ms: number;
-  estimated_cost: number;
-  regression_pass_rate: number;
+  /** null when no successful experiments exist */
+  avg_quality_score: number | null;
+  /** null when no successful experiments exist */
+  avg_latency_ms: number | null;
+  /** null when no successful experiments exist */
+  estimated_cost: number | null;
+  /** null when no experiments have regression verdicts */
+  regression_pass_rate: number | null;
   quality_over_time: { date: string; score: number }[];
   latency_over_time: { date: string; latency: number }[];
   cost_over_time: { date: string; cost: number }[];
@@ -261,4 +280,5 @@ export interface ExperimentFilters {
   prompt_version?: string;
   status?: RegressionStatus | "all";
   since?: string;
+  date?: string;
 }

@@ -28,7 +28,7 @@ function statusForCost(deltaPct: number, threshold: number): RegressionStatus {
 }
 
 function findMetric(list: MetricResult[], key: string): number | undefined {
-  return list.find((m) => m.key === key)?.score;
+  return list.find((m) => m.key === key)?.score ?? undefined;
 }
 
 export interface ComparisonInput {
@@ -48,12 +48,14 @@ export function computeComparison(input: ComparisonInput): RegressionComparison 
 
   const metrics: RegressionMetric[] = [];
 
-  const qualityDelta = round(candidate.quality_score - baseline.quality_score, 1);
+  const candQuality = candidate.quality_score ?? 0;
+  const baseQuality = baseline.quality_score ?? 0;
+  const qualityDelta = round(candQuality - baseQuality, 1);
   metrics.push({
     key: "overall_quality",
     label: "Overall Quality",
-    baseline: baseline.quality_score,
-    candidate: candidate.quality_score,
+    baseline: baseQuality,
+    candidate: candQuality,
     delta_pct: qualityDelta,
     threshold_pct: -thresholds.max_quality_regression_pct,
     direction: "higher_is_better",
@@ -94,36 +96,22 @@ export function computeComparison(input: ComparisonInput): RegressionComparison 
     });
   }
 
+  const candLatency = candidate.avg_latency_ms ?? 0;
+  const baseLatency = baseline.avg_latency_ms ?? 0;
   const latencyDelta = round(
-    ((candidate.avg_latency_ms - baseline.avg_latency_ms) / baseline.avg_latency_ms) * 100,
+    baseLatency !== 0 ? ((candLatency - baseLatency) / baseLatency) * 100 : 0,
     1,
   );
   metrics.push({
     key: "latency",
     label: "Avg Latency",
-    baseline: baseline.avg_latency_ms,
-    candidate: candidate.avg_latency_ms,
+    baseline: baseLatency,
+    candidate: candLatency,
     delta_pct: latencyDelta,
     threshold_pct: thresholds.max_latency_increase_pct,
     direction: "lower_is_better",
     unit: "ms",
     status: statusForCost(latencyDelta, thresholds.max_latency_increase_pct),
-  });
-
-  const costDelta = round(
-    ((candidate.estimated_cost - baseline.estimated_cost) / baseline.estimated_cost) * 100,
-    1,
-  );
-  metrics.push({
-    key: "cost",
-    label: "Estimated Cost",
-    baseline: baseline.estimated_cost,
-    candidate: candidate.estimated_cost,
-    delta_pct: costDelta,
-    threshold_pct: thresholds.max_cost_increase_pct,
-    direction: "lower_is_better",
-    unit: "usd",
-    status: statusForCost(costDelta, thresholds.max_cost_increase_pct),
   });
 
   const categories: CategoryRegression[] = Object.keys(input.baselineCategories)
@@ -150,14 +138,16 @@ export function computeComparison(input: ComparisonInput): RegressionComparison 
   for (const cand of input.candidateCases) {
     const base = baselineByCase.get(cand.case_id);
     if (!base) continue;
-    const delta = round(cand.score - base.score, 1);
+    const candScore = cand.score ?? 0;
+    const baseScore = base.score ?? 0;
+    const delta = round(candScore - baseScore, 1);
     const shared = {
       case_id: cand.case_id,
       input: cand.input,
       expected_output: cand.expected_output,
       category: cand.category,
-      baseline_score: base.score,
-      candidate_score: cand.score,
+      baseline_score: baseScore,
+      candidate_score: candScore,
       delta,
       baseline_output: base.model_output,
       candidate_output: cand.model_output,
@@ -166,13 +156,13 @@ export function computeComparison(input: ComparisonInput): RegressionComparison 
       regressed_cases.push({
         ...shared,
         failure_reason: cand.failure_reason ?? "Score fell below the pass threshold.",
-        judge_explanation: cand.judge_explanation,
+        judge_explanation: cand.judge_explanation ?? "",
       });
     } else if (delta >= 8 && cand.status === "PASS") {
       improved_cases.push({
         ...shared,
         failure_reason: "",
-        judge_explanation: cand.judge_explanation,
+        judge_explanation: cand.judge_explanation ?? "",
       });
     }
   }
@@ -205,12 +195,6 @@ export function computeComparison(input: ComparisonInput): RegressionComparison 
       passed: latencyDelta <= thresholds.max_latency_increase_pct,
     },
     {
-      label: "Cost increase",
-      limit: `≤ ${thresholds.max_cost_increase_pct}%`,
-      actual: `${costDelta >= 0 ? "+" : ""}${costDelta}%`,
-      passed: costDelta <= thresholds.max_cost_increase_pct,
-    },
-    {
       label: "Critical-category regression",
       limit: "0 categories",
       actual: `${criticalRegressions.length} ${criticalRegressions.length === 1 ? "category" : "categories"}`,
@@ -238,11 +222,6 @@ export function computeComparison(input: ComparisonInput): RegressionComparison 
   if (latencyDelta > thresholds.max_latency_increase_pct) {
     reasons.push(
       `Average latency increased ${latencyDelta}%, exceeding the allowed increase of ${thresholds.max_latency_increase_pct}%.`,
-    );
-  }
-  if (costDelta > thresholds.max_cost_increase_pct) {
-    reasons.push(
-      `Estimated cost increased ${costDelta}%, exceeding the allowed increase of ${thresholds.max_cost_increase_pct}%.`,
     );
   }
   for (const c of criticalRegressions) {

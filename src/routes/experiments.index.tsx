@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { listDatasets } from "@/api/datasets";
-import { listExperiments } from "@/api/experiments";
+import { deleteExperiment, listExperiments } from "@/api/experiments";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/common/States";
 import { ExperimentTable } from "@/components/experiments/ExperimentTable";
@@ -25,7 +25,8 @@ export const Route = createFileRoute("/experiments/")({
       { title: "Experiments — LLMOps Studio" },
       {
         name: "description",
-        content: "Searchable history of evaluation runs with quality, latency and cost.",
+        content:
+          "Searchable history of evaluation runs with quality, latency and regression pass rate.",
       },
       { property: "og:title", content: "Experiments — LLMOps Studio" },
       { property: "og:description", content: "Evaluation run history and comparison." },
@@ -37,13 +38,14 @@ export const Route = createFileRoute("/experiments/")({
 function ExperimentsPage() {
   const { q } = Route.useSearch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState(q ?? "");
   const [datasetId, setDatasetId] = useState("all");
   const [provider, setProvider] = useState<Provider | "all">("all");
   const [model, setModel] = useState("all");
   const [promptVersion, setPromptVersion] = useState("all");
   const [status, setStatus] = useState<RegressionStatus | "all">("all");
-  const [since, setSince] = useState("");
+  const [date, setDate] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
 
   const datasets = useQuery({ queryKey: ["datasets"], queryFn: listDatasets });
@@ -54,7 +56,7 @@ function ExperimentsPage() {
     model,
     prompt_version: promptVersion,
     status,
-    ...(since ? { since } : {}),
+    ...(date ? { date } : {}),
   };
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["experiments", filters],
@@ -62,6 +64,53 @@ function ExperimentsPage() {
   });
 
   const allModels = [...new Set((data ?? []).map((e) => e.model))];
+
+  const filteredExperiments = (data ?? []).filter((e) => {
+    if (search) {
+      const queryStr = search.toLowerCase();
+      const matchesName = e.name.toLowerCase().includes(queryStr);
+      const matchesId = e.id.toLowerCase().includes(queryStr);
+      const matchesDataset = (e.dataset_name || "").toLowerCase().includes(queryStr);
+      const matchesPrompt = (e.prompt_name || "").toLowerCase().includes(queryStr);
+      const matchesModel = e.model.toLowerCase().includes(queryStr);
+      if (!matchesName && !matchesId && !matchesDataset && !matchesPrompt && !matchesModel) {
+        return false;
+      }
+    }
+    if (datasetId !== "all" && e.dataset_id !== datasetId) return false;
+    if (provider !== "all" && e.provider.toLowerCase() !== provider.toLowerCase()) return false;
+    if (model !== "all" && e.model.toLowerCase() !== model.toLowerCase()) return false;
+    if (promptVersion !== "all" && String(e.prompt_version) !== String(promptVersion)) return false;
+    if (
+      status !== "all" &&
+      (e.result_status || e.regression_status).toUpperCase() !== status.toUpperCase()
+    )
+      return false;
+    if (date) {
+      const expDateStr = e.created_at.slice(0, 10);
+      if (expDateStr !== date) return false;
+    }
+    return true;
+  });
+
+  const hasActiveFilters =
+    search !== "" ||
+    datasetId !== "all" ||
+    provider !== "all" ||
+    model !== "all" ||
+    promptVersion !== "all" ||
+    status !== "all" ||
+    date !== "";
+
+  const resetFilters = () => {
+    setSearch("");
+    setDatasetId("all");
+    setProvider("all");
+    setModel("all");
+    setPromptVersion("all");
+    setStatus("all");
+    setDate("");
+  };
 
   const toggle = (id: string) =>
     setSelected((prev) =>
@@ -80,7 +129,20 @@ function ExperimentsPage() {
     });
   };
 
-  const selectCls = "h-9 rounded-sm border border-input bg-transparent px-2 text-sm";
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteExperiment(id);
+      toast.success("Experiment deleted successfully.");
+      setSelected((prev) => prev.filter((x) => x !== id));
+      void queryClient.invalidateQueries({ queryKey: ["experiments"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete experiment.");
+    }
+  };
+
+  const selectCls =
+    "h-9 rounded-sm border border-input bg-transparent px-2 pr-7 text-sm max-w-full min-w-0 truncate cursor-pointer";
 
   return (
     <div className="space-y-6">
@@ -164,11 +226,16 @@ function ExperimentsPage() {
         </select>
         <Input
           type="date"
-          value={since}
-          onChange={(e) => setSince(e.target.value)}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
           className="h-9 w-40"
-          aria-label="Created after"
+          aria-label="Filter by date"
         />
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9 text-xs">
+            Reset filters
+          </Button>
+        )}
       </div>
 
       <div className="panel">
@@ -180,15 +247,16 @@ function ExperimentsPage() {
             onRetry={() => void refetch()}
           />
         )}
-        {data && data.length === 0 && (
+        {data && filteredExperiments.length === 0 && (
           <EmptyState className="m-4" title="No experiments match these filters" />
         )}
-        {data && data.length > 0 && (
+        {data && filteredExperiments.length > 0 && (
           <ExperimentTable
-            experiments={data}
+            experiments={filteredExperiments}
             selectable
             selected={selected}
             onToggleSelect={toggle}
+            onDelete={handleDelete}
           />
         )}
       </div>

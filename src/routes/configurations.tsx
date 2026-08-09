@@ -1,17 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   createModelConfiguration,
   createPromptConfiguration,
   createPromptVersion,
+  deleteModelConfiguration,
+  deletePromptConfiguration,
   listModelConfigurations,
   listPromptConfigurations,
+  updateModelConfiguration,
+  updatePromptConfiguration,
   updatePromptVersion,
 } from "@/api/configurations";
 import { getSettings } from "@/api/settings";
+import { DeleteConfirmDialog } from "@/components/common/DeleteConfirmDialog";
 import { PageHeader, SectionHeader } from "@/components/common/PageHeader";
 import { ProviderBadge } from "@/components/common/ProviderBadge";
 import { PromptStatusBadge } from "@/components/common/StatusBadge";
@@ -37,9 +43,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, truncate } from "@/utils/format";
-import type { PromptConfiguration, PromptStatus, Provider } from "@/types";
+import type { ModelConfiguration, PromptConfiguration, PromptStatus, Provider } from "@/types";
+
+interface ConfigurationsSearch {
+  tab?: "models" | "prompts";
+  highlight?: string;
+}
 
 export const Route = createFileRoute("/configurations")({
+  validateSearch: (search: Record<string, unknown>): ConfigurationsSearch => {
+    const tabVal = search["tab"];
+    const highlightVal = search["highlight"];
+    return {
+      tab: tabVal === "prompts" ? "prompts" : "models",
+      ...(typeof highlightVal === "string" ? { highlight: highlightVal } : {}),
+    };
+  },
   head: () => ({
     meta: [
       { title: "Configurations — LLMOps Studio" },
@@ -55,6 +74,7 @@ export const Route = createFileRoute("/configurations")({
 });
 
 function ConfigurationsPage() {
+  const { tab = "models", highlight } = Route.useSearch();
   const queryClient = useQueryClient();
   const models = useQuery({ queryKey: ["model-configs"], queryFn: listModelConfigurations });
   const prompts = useQuery({ queryKey: ["prompt-configs"], queryFn: listPromptConfigurations });
@@ -65,6 +85,16 @@ function ConfigurationsPage() {
     name: "",
     provider: "groq" as Provider,
     model: "llama-3.3-70b-versatile",
+    temperature: 0.2,
+    max_tokens: 1024,
+  });
+
+  const [editModelOpen, setEditModelOpen] = useState(false);
+  const [editingModel, setEditingModel] = useState<ModelConfiguration | null>(null);
+  const [editModelForm, setEditModelForm] = useState({
+    name: "",
+    provider: "groq" as Provider,
+    model: "",
     temperature: 0.2,
     max_tokens: 1024,
   });
@@ -80,15 +110,107 @@ function ConfigurationsPage() {
     notes: "",
   });
   const [historyOf, setHistoryOf] = useState<PromptConfiguration | null>(null);
+  const [deletingModel, setDeletingModel] = useState<{ id: string; name: string } | null>(null);
+  const [deletingPrompt, setDeletingPrompt] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const providerModels =
-    settings.data?.providers.find((p) => p.provider === modelForm.provider)?.models ?? [];
+  const handleDeleteModel = async () => {
+    if (!deletingModel) return;
+    setIsDeleting(true);
+    try {
+      await deleteModelConfiguration(deletingModel.id);
+      toast.success("Model configuration deleted successfully.");
+      void queryClient.invalidateQueries({ queryKey: ["model-configs"] });
+      setDeletingModel(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete model configuration.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeletePrompt = async () => {
+    if (!deletingPrompt) return;
+    setIsDeleting(true);
+    try {
+      await deletePromptConfiguration(deletingPrompt.id);
+      toast.success("Prompt configuration deleted successfully.");
+      void queryClient.invalidateQueries({ queryKey: ["prompt-configs"] });
+      setDeletingPrompt(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete prompt configuration.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const getModelsForProvider = (prov: Provider): string[] => {
+    const fromSettings = settings.data?.providers.find((p) => p.provider === prov)?.models;
+    if (fromSettings && fromSettings.length > 0) return fromSettings;
+    return prov === "gemini"
+      ? ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]
+      : ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"];
+  };
+
+  const providerModels = getModelsForProvider(modelForm.provider);
+  const editProviderModels = editingModel ? getModelsForProvider(editingModel.provider) : [];
+
+  const openNewModelModal = () => {
+    const defaultProvider: Provider = "groq";
+    const available = getModelsForProvider(defaultProvider);
+    setModelForm({
+      name: "",
+      provider: defaultProvider,
+      model: available[0] ?? "llama-3.3-70b-versatile",
+      temperature: 0.2,
+      max_tokens: 1024,
+    });
+    setModelOpen(true);
+  };
+
+  const openEditModelModal = (m: ModelConfiguration) => {
+    setEditingModel(m);
+    setEditModelForm({
+      name: m.name,
+      provider: m.provider,
+      model: m.model,
+      temperature: m.temperature,
+      max_tokens: m.max_tokens,
+    });
+    setEditModelOpen(true);
+  };
 
   const saveModel = useMutation({
     mutationFn: () => createModelConfiguration(modelForm),
     onSuccess: () => {
       toast.success("Model configuration created");
       setModelOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["model-configs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateModel = useMutation({
+    mutationFn: () => {
+      if (!editingModel) throw new Error("No model configuration selected.");
+      if (!editModelForm.name.trim()) throw new Error("Configuration name is required.");
+      if (editModelForm.temperature < 0.0 || editModelForm.temperature > 2.0) {
+        throw new Error("Temperature must be between 0.0 and 2.0");
+      }
+      if (!Number.isInteger(editModelForm.max_tokens) || editModelForm.max_tokens <= 0) {
+        throw new Error("Max tokens must be a positive integer");
+      }
+      return updateModelConfiguration(editingModel.id, {
+        name: editModelForm.name.trim(),
+        model: editModelForm.model.trim(),
+        temperature: editModelForm.temperature,
+        max_tokens: editModelForm.max_tokens,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Model configuration updated successfully.");
+      setEditModelOpen(false);
+      setEditingModel(null);
       void queryClient.invalidateQueries({ queryKey: ["model-configs"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -106,14 +228,24 @@ function ConfigurationsPage() {
         return;
       }
       if (!activePrompt) throw new Error("No prompt selected.");
+      if (promptMode === "edit") {
+        if (!promptForm.name.trim()) throw new Error("Prompt configuration name is required.");
+        await updatePromptConfiguration(activePrompt.id, { name: promptForm.name.trim() });
+        return;
+      }
       if (promptMode === "version") {
         await createPromptVersion(activePrompt.id, body);
         return;
       }
-      await updatePromptVersion(activePrompt.id, activePrompt.latest_version, body);
     },
     onSuccess: () => {
-      toast.success("Prompt saved");
+      toast.success(
+        promptMode === "edit"
+          ? "Prompt configuration updated"
+          : promptMode === "version"
+            ? "New prompt version created"
+            : "Prompt created",
+      );
       setPromptOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["prompt-configs"] });
     },
@@ -141,7 +273,7 @@ function ConfigurationsPage() {
         description="Model settings and versioned prompts. Provider credentials are managed by the backend environment, never in the browser."
       />
 
-      <Tabs defaultValue="models">
+      <Tabs defaultValue={tab}>
         <TabsList>
           <TabsTrigger value="models">Model Configurations</TabsTrigger>
           <TabsTrigger value="prompts">Prompt Configurations</TabsTrigger>
@@ -152,7 +284,7 @@ function ConfigurationsPage() {
             title="Model configurations"
             description="reusable provider + decoding settings"
             actions={
-              <Button size="sm" onClick={() => setModelOpen(true)}>
+              <Button size="sm" onClick={openNewModelModal}>
                 <Plus className="size-4" /> New model config
               </Button>
             }
@@ -176,11 +308,17 @@ function ConfigurationsPage() {
                     <TableHead className="text-right">Temperature</TableHead>
                     <TableHead className="text-right">Max tokens</TableHead>
                     <TableHead className="text-right">Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {models.data.map((m) => (
-                    <TableRow key={m.id}>
+                    <TableRow
+                      key={m.id}
+                      className={cn(
+                        m.id === highlight && "bg-accent/40 font-semibold ring-1 ring-primary/40",
+                      )}
+                    >
                       <TableCell className="text-sm font-medium">{m.name}</TableCell>
                       <TableCell>
                         <ProviderBadge provider={m.provider} />
@@ -190,6 +328,25 @@ function ConfigurationsPage() {
                       <TableCell className="num text-right text-sm">{m.max_tokens}</TableCell>
                       <TableCell className="num text-right text-xs text-muted-foreground">
                         {formatDate(m.created_at)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModelModal(m)}
+                          aria-label={`Edit model configuration ${m.name}`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-destructive inline-flex ml-1 align-middle"
+                          onClick={() => setDeletingModel({ id: m.id, name: m.name })}
+                          aria-label={`Delete model configuration ${m.name}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -254,6 +411,15 @@ function ConfigurationsPage() {
                         <Button variant="ghost" size="sm" onClick={() => setHistoryOf(p)}>
                           History
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-destructive inline-flex ml-1 align-middle"
+                          onClick={() => setDeletingPrompt({ id: p.id, name: p.name })}
+                          aria-label={`Delete prompt configuration ${p.name}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -285,9 +451,18 @@ function ConfigurationsPage() {
                   id="mc-provider"
                   className="h-9 w-full rounded-sm border border-input bg-transparent px-3 text-sm"
                   value={modelForm.provider}
-                  onChange={(e) =>
-                    setModelForm({ ...modelForm, provider: e.target.value as Provider })
-                  }
+                  onChange={(e) => {
+                    const nextProvider = e.target.value as Provider;
+                    const availableModels = getModelsForProvider(nextProvider);
+                    const nextModel = availableModels.includes(modelForm.model)
+                      ? modelForm.model
+                      : (availableModels[0] ?? "");
+                    setModelForm({
+                      ...modelForm,
+                      provider: nextProvider,
+                      model: nextModel,
+                    });
+                  }}
                 >
                   <option value="groq">Groq</option>
                   <option value="gemini">Google Gemini</option>
@@ -350,6 +525,88 @@ function ConfigurationsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={editModelOpen} onOpenChange={setEditModelOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Model Configuration</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-mc-name">Configuration name</Label>
+              <Input
+                id="edit-mc-name"
+                value={editModelForm.name}
+                onChange={(e) => setEditModelForm({ ...editModelForm, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-mc-provider">Provider</Label>
+                <Input
+                  id="edit-mc-provider"
+                  value={editModelForm.provider === "gemini" ? "Google Gemini" : "Groq"}
+                  disabled
+                  className="bg-muted text-muted-foreground cursor-not-allowed"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Provider cannot be changed after creation. Create a new configuration to use a
+                  different provider.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-mc-model">Model</Label>
+                <select
+                  id="edit-mc-model"
+                  className="h-9 w-full rounded-sm border border-input bg-transparent px-3 text-sm"
+                  value={editModelForm.model}
+                  onChange={(e) => setEditModelForm({ ...editModelForm, model: e.target.value })}
+                >
+                  {editProviderModels.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-mc-temp">Temperature</Label>
+                <Input
+                  id="edit-mc-temp"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  value={editModelForm.temperature}
+                  onChange={(e) =>
+                    setEditModelForm({ ...editModelForm, temperature: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-mc-tokens">Max tokens</Label>
+                <Input
+                  id="edit-mc-tokens"
+                  type="number"
+                  step="128"
+                  value={editModelForm.max_tokens}
+                  onChange={(e) =>
+                    setEditModelForm({ ...editModelForm, max_tokens: Number(e.target.value) })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditModelOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => updateModel.mutate()} disabled={updateModel.isPending}>
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -362,6 +619,17 @@ function ConfigurationsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {promptMode === "edit" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="p-name">Prompt configuration name</Label>
+                <Input
+                  id="p-name"
+                  value={promptForm.name}
+                  onChange={(e) => setPromptForm({ ...promptForm, name: e.target.value })}
+                  placeholder="e.g. Customer Support Policy Prompt"
+                />
+              </div>
+            )}
             {promptMode === "create" && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -396,6 +664,10 @@ function ConfigurationsPage() {
                 rows={6}
                 value={promptForm.system_prompt}
                 onChange={(e) => setPromptForm({ ...promptForm, system_prompt: e.target.value })}
+                disabled={promptMode === "edit"}
+                className={cn(
+                  promptMode === "edit" && "bg-muted cursor-not-allowed text-muted-foreground",
+                )}
               />
             </div>
             <div className="space-y-1.5">
@@ -405,6 +677,10 @@ function ConfigurationsPage() {
                 rows={3}
                 value={promptForm.user_template}
                 onChange={(e) => setPromptForm({ ...promptForm, user_template: e.target.value })}
+                disabled={promptMode === "edit"}
+                className={cn(
+                  promptMode === "edit" && "bg-muted cursor-not-allowed text-muted-foreground",
+                )}
               />
             </div>
             <div className="space-y-1.5">
@@ -413,8 +689,18 @@ function ConfigurationsPage() {
                 id="p-notes"
                 value={promptForm.notes}
                 onChange={(e) => setPromptForm({ ...promptForm, notes: e.target.value })}
+                disabled={promptMode === "edit"}
+                className={cn(
+                  promptMode === "edit" && "bg-muted cursor-not-allowed text-muted-foreground",
+                )}
               />
             </div>
+            {promptMode === "edit" && (
+              <p className="text-xs text-muted-foreground">
+                Version content is read-only in Edit mode. To modify system prompt or user template,
+                use <strong>New version</strong>.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPromptOpen(false)}>
@@ -451,6 +737,24 @@ function ConfigurationsPage() {
           </ol>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={deletingModel !== null}
+        onOpenChange={(open) => !open && setDeletingModel(null)}
+        title={`Delete model configuration "${deletingModel?.name ?? ""}"?`}
+        description="This permanently removes this model configuration. This action cannot be undone."
+        onConfirm={handleDeleteModel}
+        isDeleting={isDeleting}
+      />
+
+      <DeleteConfirmDialog
+        open={deletingPrompt !== null}
+        onOpenChange={(open) => !open && setDeletingPrompt(null)}
+        title={`Delete prompt configuration "${deletingPrompt?.name ?? ""}"?`}
+        description="This permanently removes this prompt configuration and its version history. This action cannot be undone."
+        onConfirm={handleDeletePrompt}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }
