@@ -189,21 +189,6 @@ Keep model settings and prompt changes reproducible across experiments.
 
 > Configuration changes can be evaluated as controlled experiments instead of being lost between runs.
 
-## 📊 Experiment Tracking
-
-Every evaluation run is stored as a reproducible experiment with its dataset, model, prompt version, results, and execution telemetry.
-
-Track:
-
-- Quality & pass rate
-- Average & P95 latency
-- Input/output/total tokens
-- Estimated cost
-- Per-case evaluation results
-- Experiment status and history
-
-![Experiment Tracking](screenshots/02-experiment-tracking.png)
-
 ## 🚦 Promotion Gates
 
 Regression results are converted into an actionable release decision.
@@ -256,20 +241,6 @@ The backend includes a dedicated automated test suite covering:
 
 External LLM APIs are mocked, so the test suite does not require live provider calls.
 
-```bash
-pytest backend/tests
-
-```markdown
-## 🚀 Quick Start
-
-### Docker Compose
-
-```bash
-git clone https://github.com/ChetanVK10/EvalForge.git
-cd EvalForge
-
-docker compose up --build
-```
 ## 🚀 Quick Start
 
 ### Docker Compose
